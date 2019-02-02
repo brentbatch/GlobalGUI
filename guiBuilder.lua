@@ -48,16 +48,17 @@ print("guibuilder reloaded")
 -- 		bgPosY (number) -- the y pos of the top left corner of the background
 --		visible (boolean) -- is the gui visible ?
 -- 		on_hide (function) -- the onhide callback that will be called on hiding the gui
+--		onClick (function (+ arg: widget{id, func(getText)(setText), getPosition, visible)) -- this onClick function will be called when clicking on any clickable button in the gui
 
 
 
 -- all ITEMS: 
 -- buttonItem, buttonSmallItem, labelItem, labelSmallItem, textBoxItem, invisibleBoxItem
 --
--- buttonItem(posx, posy, width, height, value, onclick_callback = nil , play_sound = nil, border = true )
+-- buttonItem(posX, posY, width, height, value, onclick_callback = nil , play_sound = nil, border = true )
 --   creates a new item, you can add these items to the guiBuilder instance
---  	Arguments: * posx (number) - the x position on the screen, add bgposx if you want relative from the background
---              * posy (number) - the y position on the screen
+--  	Arguments: * posX (number) - the x position on the screen, add bgposx if you want relative from the background
+--              * posY (number) - the y position on the screen
 --              * widht (number) - width
 --              * height (number) - height
 --              * value (string) - the item text value
@@ -72,7 +73,7 @@ print("guibuilder reloaded")
 --  *UserData* Item: onClick (function) 
 --  
 --  NOTE: textBoxItem has no border option, never has a border
---  NOTE: invisibleBoxItem has no value or border, usage: invisibleBoxItem(posx, posy, width, height, onclick_callback = nil , play_sound = nil)
+--  NOTE: invisibleBoxItem has no value or border, usage: invisibleBoxItem(posX, posY, width, height, onclick_callback = nil , play_sound = nil)
 
 
 -- SPECIAL ITEMS:
@@ -105,8 +106,8 @@ print("guibuilder reloaded")
 
 -- optionMenuItem(posX, posY, width, height)
 --   creates a new optionsMenu (arrowbuttons and stuff) , better performance than adding several buttonSmallItem
---  Arguments: * posx (number) - the x position of the options menu on screen (add bgPosX to line up inside the background)
---			   * posy (number) - the y position of the options menu on screen (add bgPosY to line up inside the background)
+--  Arguments: * posX (number) - the x position of the options menu on screen (add bgPosX to line up inside the background)
+--			   * posY (number) - the y position of the options menu on screen (add bgPosY to line up inside the background)
 --			   * width (number) - width
 --			   * height (number) - height
 --
@@ -140,7 +141,8 @@ print("guibuilder reloaded")
 -- NOTE: for setText() and getText(), reference the widget: optionMenuItem.items[1].label.widget:setText("lolol")
 
 
-function guiBuilder(title, width, height, on_hide, protectionlayers)
+
+function guiBuilder(title, width, height, on_hide, protectionlayers, autoscale)
 	assert(type(title) == "string" or title == nil, "guiBuilder:Title: string expected! got: "..type(title))
 	assert(type(width) == "number" or width == nil, "guiBuilder:width: number expected! got: "..type(width))
 	assert(type(height) == "number" or height == nil, "guiBuilder:height: number expected! got: "..type(height))
@@ -149,6 +151,11 @@ function guiBuilder(title, width, height, on_hide, protectionlayers)
 	local guiBuilder = {}
 	
 	guiBuilder.on_hide = on_hide
+	guiBuilder.autoscale = (autoscale == true or autoscale == nil)
+	guiBuilder.scaleX = 1
+	guiBuilder.scaleY = 1
+	guiBuilderScaleX = 1
+	guiBuilderScaleY = 1
 	guiBuilder.width = width or 600
 	guiBuilder.height = height or 300
 	guiBuilder.title = title or ""
@@ -158,7 +165,6 @@ function guiBuilder(title, width, height, on_hide, protectionlayers)
 	
 	guiBuilder.onVisibleDetect_1 = nil
 	guiBuilder.onVisibleDetect_2 = nil
-	guiBuilder.onVisibleDetect_backup = nil -- broken, needs fixing (needed when bg is destroyed)
 	guiBuilder.items = {}
 	guiBuilder.onClickRouteTable = {}
 	
@@ -166,10 +172,17 @@ function guiBuilder(title, width, height, on_hide, protectionlayers)
 		assert(type(self) == "table", "setupGui:self: class expected! got: "..type(self))
 		assert(type(parentClass) == "table", "setupGui:self: class expected! got: "..type(parentClass))
 		
-		-- throw all gui crap inside backlog
         local screenWidth, screenHeight = sm.gui.getScreenSize()
-        self.bgPosX = (screenWidth - width)/2
-        self.bgPosY = (screenHeight - height)/2
+		if self.autoscale then -- 'native' res = 1080p
+			self.scaleX = screenHeight/1080
+			self.scaleY = screenWidth/1920
+			guiBuilderScaleY = self.scaleX
+			guiBuilderScaleX = self.scaleY -- global for other item elements
+		end
+		self.width, self.height = self.width*self.scaleX, self.height*self.scaleY
+		
+        self.bgPosX = (screenWidth - self.width)/2
+        self.bgPosY = (screenHeight - self.height)/2
 		
         self.guiBg = sm.gui.load("ChallengeMessage.layout", true)
         self.guiBg:setPosition(self.bgPosX, self.bgPosY)
@@ -181,7 +194,7 @@ function guiBuilder(title, width, height, on_hide, protectionlayers)
         local bgMainPanel = self.guiBg:find("MainPanel")
         sm.gui.widget.destroy(bgMainPanel:find("Next"))
         sm.gui.widget.destroy(bgMainPanel:find("Reset"))
-        bgMainPanel:setSize(width, height)
+        bgMainPanel:setSize(self.width, self.height)
         bgMainPanel:setPosition(0, 0)
 		bgMainPanel:bindOnClick("killbg")
 		
@@ -208,6 +221,7 @@ function guiBuilder(title, width, height, on_hide, protectionlayers)
 			local itemid = guibuilder.onClickRouteTable[widget.id]
 			if guibuilder.items[itemid].onClick then guibuilder.items[itemid]:onClick(widget.id) end
 			--Copyright (c) 2019 Brent Batch--
+			if guibuilder.onClick then guibuilder.onClick(widget) end
 		end
 		function parentClass.killview(self, widget) -- only bg items
 			guibuilder.items[widget.id]:setVisible(false)
@@ -222,9 +236,14 @@ function guiBuilder(title, width, height, on_hide, protectionlayers)
 			if guibuilder.guiBg then
 				guibuilder.guiBg:setVisible(false)
 				guibuilder.guiBg = nil
-				guibuilder.onVisibleDetect_2 = guibuilder.onVisibleDetect_1
-				guibuilder.onVisibleDetect_1 = guibuilder.onVisibleDetect_backup 
 			end
+			parentClass.client_onUpdate = nil
+			guibuilder.instantiated = false
+			self.network:sendToServer("server_refreshgui")
+		end
+		function parentClass.server_refreshgui(self)
+			sm.shape.destroyShape( self.shape, 0 )
+			sm.shape.createPart( self.shape:getShapeUuid(), self.remoteguiposition, sm.quat.identity(), false, true ) 
 		end
 		function parentClass.client_onUpdate(self, dt)
 			guibuilder:update(dt)
@@ -260,7 +279,6 @@ function guiBuilder(title, width, height, on_hide, protectionlayers)
 
 	function guiBuilder.setVisibleDetection(self, newbutton)
 		self.onVisibleDetect_1 = self.onVisibleDetect_1 or newbutton
-		self.onVisibleDetect_backup = newbutton
 	end
 	
 	
@@ -293,21 +311,23 @@ function guiBuilder(title, width, height, on_hide, protectionlayers)
 end
 
 
-function buttonItem( posx, posy, width, height, value, onclick_callback, play_sound, border )
-	assert(type(posx) == "number", "buttonItem: posx, number expected! got: "..type(posx))
-	assert(type(posy) == "number", "buttonItem: posy, number expected! got: "..type(posy))
+function buttonItem( posX, posY, width, height, value, onclick_callback, play_sound, border )
+	assert(type(posX) == "number", "buttonItem: posX, number expected! got: "..type(posX))
+	assert(type(posY) == "number", "buttonItem: posY, number expected! got: "..type(posY))
 	assert(type(width) == "number", "buttonItem: width, number expected! got: "..type(width))
 	assert(type(height) == "number", "buttonItem: height, number expected! got: "..type(height))
 	assert(type(value) == "string", "buttonItem: value, string expected! got: "..type(value))
 	assert(type(onclick_callback) == "function" or onclick_callback == nil, "buttonItem: onclick_callback, function or nil expected! got: "..type(onclick_callback))
 	assert(type(play_sound) == "string" or play_sound == nil, "buttonItem: play_sound, string or nil expected! got: "..type(play_sound))
 	assert(type(border) == "boolean" or border == nil, "buttonItem: border, boolean or nil expected! got: "..type(border))
-	
+	if guiBuilderScaleX and guiBuilderScaleY then
+		posX, posY, width, height = posX*guiBuilderScaleX, posY*guiBuilderScaleY, width*guiBuilderScaleX, height*guiBuilderScaleY
+	end
 	local extra = (border == false and 10 or 0)
 	local item = {}
 	item.visible = true
 	item.gui = sm.gui.load("ChallengeMessage.layout", true)
-	item.gui:setPosition(posx , posy )
+	item.gui:setPosition(posX , posY )
 	item.gui:setSize(width, height)
 	
 
@@ -348,21 +368,23 @@ function buttonItem( posx, posy, width, height, value, onclick_callback, play_so
 	return item
 end
 
-function buttonSmallItem(posx, posy, width, height, value, onclick_callback, play_sound, border )
-	assert(type(posx) == "number", "buttonSmallItem: posx, number expected! got: "..type(posx))
-	assert(type(posy) == "number", "buttonSmallItem: posy, number expected! got: "..type(posy))
+function buttonSmallItem(posX, posY, width, height, value, onclick_callback, play_sound, border )
+	assert(type(posX) == "number", "buttonSmallItem: posX, number expected! got: "..type(posX))
+	assert(type(posY) == "number", "buttonSmallItem: posY, number expected! got: "..type(posY))
 	assert(type(width) == "number", "buttonSmallItem: width, number expected! got: "..type(width))
 	assert(type(height) == "number", "buttonSmallItem: height, number expected! got: "..type(height))
 	assert(type(value) == "string", "buttonSmallItem: value, string expected! got: "..type(value))
 	assert(type(onclick_callback) == "function" or onclick_callback == nil, "buttonSmallItem: onclick_callback, function or nil expected! got: "..type(onclick_callback))
 	assert(type(play_sound) == "string" or play_sound == nil, "buttonSmallItem: play_sound, string or nil expected! got: "..type(play_sound))
 	assert(type(border) == "boolean" or border == nil, "buttonSmallItem: border, boolean or nil expected! got: "..type(border))
-	
+	if guiBuilderScaleX and guiBuilderScaleY then
+		posX, posY, width, height = posX*guiBuilderScaleX, posY*guiBuilderScaleY, width*guiBuilderScaleX, height*guiBuilderScaleY
+	end
 	local extra = (border == false and 10 or 0)
 	local item = {}
 	item.visible = true
 	item.gui = sm.gui.load("AudioOptions.layout", true)
-	item.gui:setPosition(posx, posy )
+	item.gui:setPosition(posX, posY )
 	item.gui:setSize(width, height)
 	local buttonoffset = 300
 
@@ -407,22 +429,24 @@ function buttonSmallItem(posx, posy, width, height, value, onclick_callback, pla
 end
 
 
-function labelItem(posx, posy, width, height, value, onclick_callback, play_sound, border )	
-	assert(type(posx) == "number", "labelItem: posx, number expected! got: "..type(posx))
-	assert(type(posy) == "number", "labelItem: posy, number expected! got: "..type(posy))
+function labelItem(posX, posY, width, height, value, onclick_callback, play_sound, border )	
+	assert(type(posX) == "number", "labelItem: posX, number expected! got: "..type(posX))
+	assert(type(posY) == "number", "labelItem: posY, number expected! got: "..type(posY))
 	assert(type(width) == "number", "labelItem: width, number expected! got: "..type(width))
 	assert(type(height) == "number", "labelItem: height, number expected! got: "..type(height))
 	assert(type(value) == "string", "labelItem: value, string expected! got: "..type(value))
 	assert(type(onclick_callback) == "function" or onclick_callback == nil, "labelItem: onclick_callback, function or nil expected! got: "..type(onclick_callback))
 	assert(type(play_sound) == "string" or play_sound == nil, "labelItem: play_sound, string or nil expected! got: "..type(play_sound))
 	assert(type(border) == "boolean" or border == nil, "labelItem: border, boolean or nil expected! got: "..type(border))
-	
+	if guiBuilderScaleX and guiBuilderScaleY then
+		posX, posY, width, height = posX*guiBuilderScaleX, posY*guiBuilderScaleY, width*guiBuilderScaleX, height*guiBuilderScaleY
+	end
 	--Copyright (c) 2019 Brent Batch--
 	local extra = (border == false and 10 or 0)
 	local item = {}
 	item.visible = true
 	item.gui = sm.gui.load("ChallengeMessage.layout", true)
-	item.gui:setPosition(posx , posy )
+	item.gui:setPosition(posX , posY )
 	item.gui:setSize(width, height)
 
 	local MainPanel = item.gui:find("MainPanel")
@@ -465,21 +489,23 @@ function labelItem(posx, posy, width, height, value, onclick_callback, play_soun
 	return item
 end
 
-function labelSmallItem( posx, posy, width, height, value, onclick_callback, play_sound, border )
-	assert(type(posx) == "number", "labelSmallItem: posx, number expected! got: "..type(posx))
-	assert(type(posy) == "number", "labelSmallItem: posy, number expected! got: "..type(posy))
+function labelSmallItem( posX, posY, width, height, value, onclick_callback, play_sound, border )
+	assert(type(posX) == "number", "labelSmallItem: posX, number expected! got: "..type(posX))
+	assert(type(posY) == "number", "labelSmallItem: posY, number expected! got: "..type(posY))
 	assert(type(width) == "number", "labelSmallItem: width, number expected! got: "..type(width))
 	assert(type(height) == "number", "labelSmallItem: height, number expected! got: "..type(height))
 	assert(type(value) == "string", "labelSmallItem: value, string expected! got: "..type(value))
 	assert(type(onclick_callback) == "function" or onclick_callback == nil, "labelSmallItem: onclick_callback, function or nil expected! got: "..type(onclick_callback))
 	assert(type(play_sound) == "string" or play_sound == nil, "labelSmallItem: play_sound, string or nil expected! got: "..type(play_sound))
 	assert(type(border) == "boolean" or border == nil, "labelSmallItem: border, boolean or nil expected! got: "..type(border))
-	
+	if guiBuilderScaleX and guiBuilderScaleY then
+		posX, posY, width, height = posX*guiBuilderScaleX, posY*guiBuilderScaleY, width*guiBuilderScaleX, height*guiBuilderScaleY
+	end
 	local extra = (border == false and 10 or 0)
 	local item = {}
 	item.visible = true
-	item.gui = sm.gui.load("GreyMessageBox.layout", true)
-	item.gui:setPosition(posx , posy )
+	item.gui = sm.gui.load("GreyMsgBox.layout", true)
+	item.gui:setPosition(posX , posY )
 	item.gui:setSize(width, height)
 
 	local MainPanel = item.gui:find("MainPanel")
@@ -523,20 +549,22 @@ function labelSmallItem( posx, posy, width, height, value, onclick_callback, pla
 	return item
 end
 
-function textBoxItem( posx, posy, width, height, value, onclick_callback, play_sound ) -- no border here
-	assert(type(posx) == "number", "textBoxItem: posx, number expected! got: "..type(posx))
-	assert(type(posy) == "number", "textBoxItem: posy, number expected! got: "..type(posy))
+function textBoxItem( posX, posY, width, height, value, onclick_callback, play_sound ) -- no border here
+	assert(type(posX) == "number", "textBoxItem: posX, number expected! got: "..type(posX))
+	assert(type(posY) == "number", "textBoxItem: posY, number expected! got: "..type(posY))
 	assert(type(width) == "number", "textBoxItem: width, number expected! got: "..type(width))
 	assert(type(height) == "number", "textBoxItem: height, number expected! got: "..type(height))
 	assert(type(value) == "string", "textBoxItem: value, string expected! got: "..type(value))
 	assert(type(onclick_callback) == "function" or onclick_callback == nil, "textBoxItem: onclick_callback, function or nil expected! got: "..type(onclick_callback))
 	assert(type(play_sound) == "string" or play_sound == nil, "textBoxItem: play_sound, string or nil expected! got: "..type(play_sound))
-	
+	if guiBuilderScaleX and guiBuilderScaleY then
+		posX, posY, width, height = posX*guiBuilderScaleX, posY*guiBuilderScaleY, width*guiBuilderScaleX, height*guiBuilderScaleY
+	end
 	local item = {}
 	item.visible = true
 	item.gui = sm.gui.load("NewGameMenu.layout", true)
 	item.gui:find("NewMainPanel"):setPosition(0,-100)
-	item.gui:setPosition(posx , posy )
+	item.gui:setPosition(posX , posY )
 	item.gui:setSize(width, height)
 
 	local MainPanel = item.gui:find("NewMainPanel"):find("GamePanel")
@@ -576,20 +604,22 @@ function textBoxItem( posx, posy, width, height, value, onclick_callback, play_s
 end
 
 
-function invisibleBoxItem( posx, posy, width, height, onclick_callback, play_sound ) -- no border, also no value
-	assert(type(posx) == "number", "invisibleBoxItem: posx, number expected! got: "..type(posx))
-	assert(type(posy) == "number", "invisibleBoxItem: posy, number expected! got: "..type(posy))
+function invisibleBoxItem( posX, posY, width, height, onclick_callback, play_sound ) -- no border, also no value
+	assert(type(posX) == "number", "invisibleBoxItem: posX, number expected! got: "..type(posX))
+	assert(type(posY) == "number", "invisibleBoxItem: posY, number expected! got: "..type(posY))
 	assert(type(width) == "number", "invisibleBoxItem: width, number expected! got: "..type(width))
 	assert(type(height) == "number", "invisibleBoxItem: height, number expected! got: "..type(height))
 	assert(type(onclick_callback) == "function" or onclick_callback == nil, "invisibleBoxItem: onclick_callback, function or nil expected! got: "..type(onclick_callback))
 	assert(type(play_sound) == "string" or play_sound == nil, "invisibleBoxItem: play_sound, string or nil expected! got: "..type(play_sound))
-	
+	if guiBuilderScaleX and guiBuilderScaleY then
+		posX, posY, width, height = posX*guiBuilderScaleX, posY*guiBuilderScaleY, width*guiBuilderScaleX, height*guiBuilderScaleY
+	end
 	local item = {}
 	item.visible = true
 	item.widget = sm.gui.load("ParticlePreview.layout", true)
 
 	sm.gui.widget.destroy(item.widget:find("Background"))
-	item.widget:setPosition(posx , posy )
+	item.widget:setPosition(posX , posY )
 	item.widget:setSize(width, height)
 	
 	item.id = item.widget.id
@@ -745,7 +775,9 @@ function optionMenuItem(posX, posY, width, height)
 	assert(type(posY) == "number", "optionMenuItem: posY, number expected! got: "..type(posY))
 	assert(type(width) == "number", "optionMenuItem: width, number expected! got: "..type(width))
 	assert(type(height) == "number", "optionMenuItem: height, number expected! got: "..type(height))
-	
+	if guiBuilderScaleX and guiBuilderScaleY then
+		posX, posY, width, height = posX*guiBuilderScaleX, posY*guiBuilderScaleY, width*guiBuilderScaleX, height*guiBuilderScaleY
+	end
 	local item = {}
 	item.visible = true
 	item.gui = sm.gui.load("OptionsMenuPage.layout", true)
@@ -764,7 +796,9 @@ function optionMenuItem(posX, posY, width, height)
 		assert(type(posY) == "number", "optionMenuItem.addItem: posY, number expected! got: "..type(posY))
 		assert(type(width) == "number", "optionMenuItem.addItem: width, number expected! got: "..type(width))
 		assert(type(height) == "number", "optionMenuItem.addItem: height, number expected! got: "..type(height))
-		
+		if guiBuilderScaleX and guiBuilderScaleY then
+			posX, posY, width, height = posX*guiBuilderScaleX, posY*guiBuilderScaleY, width*guiBuilderScaleX, height*guiBuilderScaleY
+		end
 		local id = itemTableSize(self.items) + 1
 		local widgetItem = mainPanel:find("ITEM_" .. id)
 		widgetItem:setPosition(posX, posY)
@@ -781,7 +815,9 @@ function optionMenuItem(posX, posY, width, height)
 		assert(type(posY) == "number", "optionMenuItem.addItemWithId: posY, number expected! got: "..type(posY))
 		assert(type(width) == "number", "optionMenuItem.addItemWithId: width, number expected! got: "..type(width))
 		assert(type(height) == "number", "optionMenuItem.addItemWithId: height, number expected! got: "..type(height))
-	
+		if guiBuilderScaleX and guiBuilderScaleY then
+			posX, posY, width, height = posX*guiBuilderScaleX, posY*guiBuilderScaleY, width*guiBuilderScaleX, height*guiBuilderScaleY
+		end
 		local id = itemTableSize(self.items) + 1
 		local widgetItem = mainPanel:find("ITEM_" .. id)
 		widgetItem:setPosition(posX, posY)
@@ -833,7 +869,9 @@ function optionItem(widgetItem)
 		assert(type(height) == "number", "optionMenuItem.item.addLabel: height, number expected! got: "..type(height))
 		assert(type(name) == "string", "optionMenuItem.item.addLabel: name, string expected! got: "..type(name))
 		assert(type(onclick_callback) == "function" or onclick_callback == nil, "optionMenuItem.item.addLabel: onclick_callback, function or nil expected! got: "..type(onclick_callback))
-		
+		if guiBuilderScaleX and guiBuilderScaleY then
+			posX, posY, width, height = posX*guiBuilderScaleX, posY*guiBuilderScaleY, width*guiBuilderScaleX, height*guiBuilderScaleY
+		end
 		local widget = self.gui:find("Label")
 		widget:setPosition(posX, posY)
 		widget:setSize(width, height)
@@ -853,7 +891,9 @@ function optionItem(widgetItem)
 		assert(type(height) == "number", "optionMenuItem.item.addDecreaseButton: height, number expected! got: "..type(height))
 		assert(type(name) == "string", "optionMenuItem.item.addDecreaseButton: name, string expected! got: "..type(name))
 		assert(type(onclick_callback) == "function" or onclick_callback == nil, "optionMenuItem.item.addDecreaseButton: onclick_callback, function or nil expected! got: "..type(onclick_callback))
-		
+		if guiBuilderScaleX and guiBuilderScaleY then
+			posX, posY, width, height = posX*guiBuilderScaleX, posY*guiBuilderScaleY, width*guiBuilderScaleX, height*guiBuilderScaleY
+		end
 		local widget = self.gui:find("Decrease")
 		widget:setPosition(posX, posY)
 		widget:setSize(width, height)
@@ -873,7 +913,9 @@ function optionItem(widgetItem)
 		assert(type(height) == "number", "optionMenuItem.item.addValueBox: height, number expected! got: "..type(height))
 		assert(type(name) == "string", "optionMenuItem.item.addValueBox: name, string expected! got: "..type(name))
 		assert(type(onclick_callback) == "function" or onclick_callback == nil, "optionMenuItem.item.addValueBox: onclick_callback, function or nil expected! got: "..type(onclick_callback))
-		
+		if guiBuilderScaleX and guiBuilderScaleY then
+			posX, posY, width, height = posX*guiBuilderScaleX, posY*guiBuilderScaleY, width*guiBuilderScaleX, height*guiBuilderScaleY
+		end
 		local widget = self.gui:find("Value")
 		widget:setPosition(posX, posY)
 		widget:setSize(width, height)
@@ -893,7 +935,9 @@ function optionItem(widgetItem)
 		assert(type(height) == "number", "optionMenuItem.item.addIncreaseButton: height, number expected! got: "..type(height))
 		assert(type(name) == "string", "optionMenuItem.item.addIncreaseButton: name, string expected! got: "..type(name))
 		assert(type(onclick_callback) == "function" or onclick_callback == nil, "optionMenuItem.item.addIncreaseButton: onclick_callback, function or nil expected! got: "..type(onclick_callback))
-		
+		if guiBuilderScaleX and guiBuilderScaleY then
+			posX, posY, width, height = posX*guiBuilderScaleX, posY*guiBuilderScaleY, width*guiBuilderScaleX, height*guiBuilderScaleY
+		end
 		local widget = self.gui:find("Increase")
 		widget:setPosition(posX, posY)
 		widget:setSize(width, height)

@@ -36,7 +36,9 @@ end
 function guitest.client_onSetupGui( self )
 	-- only the remote shape can initialize a global gui:
 	if (self.shape.worldPosition - self.remoteguiposition):length()>self.remotedistance or (guitestgui and guitestgui.instantiated) then return end
-	guitestgui = guiBuilder("gui - test", 1100, 700)
+	
+	-- guiBuilder(title, width, height, on_hide_callback, protectionlayers, auto-scale)
+	guitestgui = guiBuilder("gui - test", 1100, 700, function()--[[onhide]]end, 50, true)
 	guitestgui.instantiated = true
 	print("==gui setup loading==")
 	
@@ -44,8 +46,9 @@ function guitest.client_onSetupGui( self )
 	
 	local bx, by = guitestgui.bgPosX, guitestgui.bgPosY -- background gui pos
 	
+	
 	local optionmenu = optionMenuItem(bx + 100, by + 100, 500, 50)
-	local item = optionmenu:addItem(0,0,500,50)
+	local item = optionmenu:addItemWithId("option1",0,0,500,50)
 	
 	local valuebox = item:addValueBox(250,0,150,50, "1")
 	item:addLabel(0,0,250-27,50, "label for this value:")
@@ -133,21 +136,26 @@ end
 
 function guitest.client_onUpdate(self, dt)
 	-- has to exist for gui to not break, gets overwritten for the global one
+	
+	--possible: if self.guiopen then --[[check if settings changed by other player, sync up by looping over all items and setting new value]]
 end
 
 function guitest.client_onInteract(self)
 	if not guitestgui then print("guitestgui not instantiated due to refresh, please place a new block") return end
 	--print(guitestgui.items.optionmenu1.items[1].label) -- example
 	
-	-- fill GLOBAL gui with self.values first:
-	guitestgui.items.optionmenu1.items[1].valueBox.widget:setText(self.savedvalue or "0")
+	-- fill GLOBAL gui with self.values first: 
+	guitestgui.items.optionmenu1.items.option1.valueBox.widget:setText(self.savedvalue or "0")
 	
 	guitestgui:show() 
 	guitestgui.on_hide =
-	function()
-		--print(self.shape)
-		-- save values in self here, then send over network 
-		self.savedvalue = guitestgui.items.optionmenu1.items[1].valueBox.widget:getText()
+	function() -- gets called when the gui is hidden
+		-- save values in self here, then send over network inside your onUpdate loop
+		self.savedvalue = guitestgui.items.optionmenu1.items.option1.valueBox.widget:getText()
+	end
+	guitestgui.onClick = 
+	function() -- when any clickable item in the gui is pressed
+		--could save stuff here
 	end
 end
 
@@ -158,7 +166,7 @@ end
 
 
 -- /* Script Developer tools:
-function guitest.client_onRefresh(self)
+function guitest.client_onRefresh(self) 
 	if guitestgui and (self.shape.worldPosition - self.remoteguiposition):length()<self.remotedistance then -- globalgui
 		if guitestgui then guitestgui:hide() end 
 		guitestgui = nil
