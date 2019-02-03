@@ -52,11 +52,14 @@ function guitest.client_onSetupGui( self )
 	
 	local valuebox = item:addValueBox(250,0,150,50, "1")
 	item:addLabel(0,0,250-27,50, "label for this value:")
-	item:addDecreaseButton(250-27,5,27,40, "test", 
+	local testlabel = labelItem(bx + 50, by + 200, 200, 100, "1" )
+	
+	item:addDecreaseButton(250-27,5,27,40, "decreasebutton",  
 		function()
+			print(testlabel)
 			valuebox:setText(tostring(tonumber(valuebox:getText())-1)) 
 		end)
-	item:addIncreaseButton(400,5,27,40, "test",
+	item:addIncreaseButton(400,5,27,40, "increasebutton",
 		function()
 			valuebox:setText(tostring(tonumber(valuebox:getText())+1)) 
 		end)
@@ -111,7 +114,6 @@ function guitest.client_onSetupGui( self )
 	
 	guitestgui:addItem(buttonSmallItem(bx + 650, by + 400, 200, 100, "<button no border>", function()print('lol')end, "GUI Inventory highlight", false ))
 	
-	guitestgui:addItem(labelItem(bx + 50, by + 400, 200, 100, "#df7000label\nborder" ))
 	guitestgui:addItem(labelItem(bx + 250, by + 400, 200, 100, "#ff0000label\nnoborder", nil , nil, false))
 	local textbox = textBoxItem(bx + 450, by + 400, 100, 100, "#00ff00textboxvalue")
 	guitestgui:addItem(textbox)
@@ -130,8 +132,9 @@ function guitest.client_onSetupGui( self )
 		end))
 	--guitestgui:addItem(invisibleBoxItem(bx, by,0, 0, guitestgui.width - 50, 50,
 	--	function()
-	--		guitestgui:hide()
-	--	end))
+	--		guitestgui:hide() 
+	--	end))  
+	guitestgui:addItem(labelSmallItem(bx + 50, by + 400, 200, 100, "smalllabel\nborder" ))
 end
 
 function guitest.client_onUpdate(self, dt)

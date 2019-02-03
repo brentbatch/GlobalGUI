@@ -504,14 +504,13 @@ function labelSmallItem( posX, posY, width, height, value, onclick_callback, pla
 	local extra = (border == false and 10 or 0)
 	local item = {}
 	item.visible = true
-	item.gui = sm.gui.load("GreyMsgBox.layout", true)
+	item.gui = sm.gui.load("MessageGuiLoadingBar.layout", true)
 	item.gui:setPosition(posX , posY )
 	item.gui:setSize(width, height)
 
-	local MainPanel = item.gui:find("MainPanel")
-	sm.gui.widget.destroy(MainPanel:find("Yes"))
-	sm.gui.widget.destroy(MainPanel:find("No"))
-	sm.gui.widget.destroy(MainPanel:find("Close"))
+	local MainPanel = item.gui:find("MessageLoadingBarMainPanel")
+	sm.gui.widget.destroy(MainPanel:find("Title"))
+	sm.gui.widget.destroy(MainPanel:find("LoadingBar"))
 	
 	MainPanel:setSize(width+extra, height+extra)
 	MainPanel:setPosition(extra/-2, extra/-2)
