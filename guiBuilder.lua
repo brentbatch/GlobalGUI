@@ -698,7 +698,7 @@ function tabControllItem(headers, items)
 			--sm.audio.play("GUI Inventory highlight") -- make this customizable ?
 			if self.headers[itemdata.itemid].onClick then self.headers[itemdata.itemid]:onClick(widgetid) end
 			self.currenttab = itemdata.itemid
-			self:setVisible(true)
+			self:setVisibleTab(true)
 		else
 			if self.items[itemdata.itemid].onClick then self.items[itemdata.itemid]:onClick(widgetid) end
 		end
@@ -708,8 +708,13 @@ function tabControllItem(headers, items)
 		for k, item in pairs(self.headers) do
 			item:setVisible(visible)
 		end
+		self:setVisibleTab(visible)
+	end
+	
+	function item.setVisibleTab(self, visible, tab)
+		--self.currenttab = (tab and tab or self.currenttab) -- change tab if defined
 		for itemindex, item in pairs(self.items) do
-			item:setVisible( itemindex == self.currenttab and visible)
+			item:setVisible(itemindex == self.currenttab and visible)
 		end
 	end
 	return item

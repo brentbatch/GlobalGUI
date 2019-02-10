@@ -21,7 +21,7 @@ guitest.remotedistance = 100 -- make this bigger if the size of your block is bi
 --[[server]]
 function guitest.server_onCreate(self) -- spawn remote global gui block
 	local uuid = self.shape:getShapeUuid()
-	sm.shape.createPart( uuid, guitest.remoteguiposition, sm.quat.identity(), false, false ) 
+	sm.shape.createPart( uuid, self.remoteguiposition, sm.quat.identity(), false, false ) 
 end
 
 function guitest.server_onFixedUpdate(self, dt)
@@ -62,7 +62,7 @@ function guitest.client_onSetupGui( self )
 	item:addIncreaseButton(400,5,27,40, "increasebutton",
 		function()
 			valuebox:setText(tostring(tonumber(valuebox:getText())+1)) 
-		end)
+		end) 
 	guitestgui:addItemWithId("optionmenu1", optionmenu) -- HOW TO GET ITEMS BY CUSTOM ID IN ONINTERACT
 	
 	local collection = collectionItems({})
@@ -76,15 +76,24 @@ function guitest.client_onSetupGui( self )
 	collection2:addItem(buttonSmallItem(bx + 700, by + 250, 100, 50, "tab stu 222") )
 	collection2:addItem(buttonSmallItem(bx + 800, by + 250, 100, 50, "tab vwx 222") )
 	
-	local button1 = buttonSmallItem(bx + 650, by + 120, 150, 70, "tab 1", function()end--[[makes sure there is a bound onClick]])
+	local button1 = buttonSmallItem(bx + 650, by + 120, 150, 70, "tab 1", function()end, "GUI Inventory highlight"--[[makes sure there is a bound onClick]])
+	local button2 = buttonSmallItem(bx + 800, by + 120, 150, 70, "tab 2", function() print("tab2") end, "GUI Inventory highlight")
 	
-	button1.onClick = 
-	function()
-		print(button1:getText())  -- example of onClick doing stuff to button itself, 
+	button1.onClick =
+	function(btn, widgetid) -- the onclick provides 2 variables, the button itself and the widgetid for the button
+		button2:setVisible(true)
+		btn:setVisible(false) 
+		print(btn:getText())  -- example of onClick doing stuff to button itself
+		sm.audio.play("GUI Inventory highlight") -- kills its playsound defined in the button initialize on line 79 so add it again
+	end 
+	button2.onClick = 
+	function(btn, widgetid)
+		button1:setVisible(true)
+		btn:setVisible(false)
+		print(btn:getText())  -- example of onClick doing stuff to button itself,
 		sm.audio.play("GUI Inventory highlight") -- kills its playsound so add it again
 	end 
 	
-	local button2 = buttonSmallItem(bx + 800, by + 120, 150, 70, "tab 2", function() print("tab2") end, "GUI Inventory highlight")
 	local tabcontroll = 
 		tabControllItem( -- makes it possible for the gui to manage collections visibility properly
 			{
