@@ -1,10 +1,8 @@
 ----------------------------------
 --Copyright (c) 2019 Brent Batch--
 ----------------------------------
+-- the global gui instance in this class is called 'guitestgui', please use unique names in your script
 
-if not guiBuilder then
-	dofile("guiBuilder.lua")
-end
 -- gui test --
 
 guitest = class( nil )
@@ -15,27 +13,41 @@ guitest.connectionOutput = 0
 guitest.colorNormal = sm.color.new(0xe54500ff)
 guitest.colorHighlight = sm.color.new(0xff7033ff)
 guitest.poseWeightCount = 1
-guitest.remoteguiposition = sm.vec3.new(0,0,2000) -- change this to prevent colliding with other gui blocks
-guitest.remotedistance = 100 -- make this bigger if the size of your block is big
+guitest.remoteguiposition = sm.vec3.new(0,0,2000) -- don't touch
+guitest.remotedistance = 100 -- don't touch
 
---[[server]]
-function guitest.server_onCreate(self) -- spawn remote global gui block
-	local uuid = self.shape:getShapeUuid()
-	sm.shape.createPart( uuid, self.remoteguiposition, sm.quat.identity(), false, false ) 
+if not guiBuilder then
+	dofile("guiBuilder.lua")
 end
 
-function guitest.server_onFixedUpdate(self, dt)
+--[[server]]
+function guitest.server_onCreate(self) -- spawn remote global gui block on first block placement which instantiates GLOBALGUI ~ magix ~ :o
+	if not guitest.remoteShape and (self.shape.worldPosition - self.remoteguiposition):length()>self.remotedistance then
+		guitest.remoteShape = true
+		local uuid = self.shape:getShapeUuid()
+		sm.shape.createPart( uuid, self.remoteguiposition, sm.quat.identity(), false, true ) 
+	end
+end
+
+function guitest.server_onFixedUpdate(self, dt) -- do not remove this callback, put code in it or keep empty
 
 end
 
 
 --[[client]]
+
 function guitest.client_onCreate(self)
+
 end
 
 function guitest.client_onSetupGui( self )
 	-- only the remote shape can initialize a global gui:
-	if (self.shape.worldPosition - self.remoteguiposition):length()>self.remotedistance or (guitestgui and guitestgui.instantiated) then return end
+	if (self.shape.worldPosition - self.remoteguiposition):length()>self.remotedistance then
+		return -- too far from remoteguiposition, this block cannot initialize gui
+	elseif (guitestgui and guitestgui.instantiated) then -- kill duplicate remote gui blocks
+		function self.server_onFixedUpdate(self, dt) self.shape:destroyShape(0) end 
+		return
+	end 
 	
 	-- guiBuilder(title, width, height, on_hide_callback, protectionlayers, auto-scale)
 	guitestgui = guiBuilder("gui - test", 1100, 700, function()--[[onhide]]end, 50, true)
@@ -121,7 +133,7 @@ function guitest.client_onSetupGui( self )
 		)
 	)
 	
-	guitestgui:addItem(buttonSmallItem(bx + 650, by + 400, 200, 100, "<button no border>", function()print('lol')end, "GUI Inventory highlight", false ))
+	guitestgui:addItem(buttonItem(bx + 650, by + 400, 200, 100, "<button no border>", function()print('lol')end, "GUI Inventory highlight", false ))
 	
 	guitestgui:addItem(labelItem(bx + 250, by + 400, 200, 100, "#ff0000label\nnoborder", nil , nil, false))
 	local textbox = textBoxItem(bx + 450, by + 400, 100, 100, "#00ff00textboxvalue")
@@ -143,54 +155,52 @@ function guitest.client_onSetupGui( self )
 	--	function()
 	--		guitestgui:hide() 
 	--	end))  
-	guitestgui:addItem(labelSmallItem(bx + 50, by + 400, 200, 100, "smalllabel\nborder" ))
+	
+	guitestgui:addItem(labelSmallItem(bx + 50, by + 400, 200, 100, "smalllabel\nborder"))
 end
 
-function guitest.client_onUpdate(self, dt)
-	-- has to exist for gui to not break, gets overwritten for the global one
-	
-	--possible: if self.guiopen then --[[check if settings changed by other player, sync up by looping over all items and setting new value]]
-end
 
 function guitest.client_onInteract(self)
-	if not guitestgui then print("guitestgui not instantiated due to refresh, please place a new block") return end
-	--print(guitestgui.items.optionmenu1.items[1].label) -- example
+	if not guitestgui then sm.gui.displayAlertText("ERROR:NotInitialized; place a new gui block") return end
 	
-	-- fill GLOBAL gui with self.values first: 
+	-- fill GLOBAL gui with self.values first (example given:)
 	guitestgui.items.optionmenu1.items.option1.valueBox.widget:setText(self.savedvalue or "0")
 	
 	guitestgui:show() 
 	guitestgui.on_hide =
 	function() -- gets called when the gui is hidden
-		-- save values in self here, then send over network inside your onUpdate loop
+		-- save values in self here:
 		self.savedvalue = guitestgui.items.optionmenu1.items.option1.valueBox.widget:getText()
+		-- self.guisettingschanged = self.savedvalue -- server syncing (uses "client_onUpdate"-code as pass-through to server)
 	end
 	guitestgui.onClick = 
-	function() -- when any clickable item in the gui is pressed
-		--could save stuff here
+	function() -- when any clickable item in the gui is clicked upon
+		-- could save values here or whatever
 	end
+end
+
+function guitest.client_onUpdate(self, dt)-- has to exist for gui to function, guibuilder overwrites this for remotegui-block >> DO NOT REMOVE
+	--[[ -- possible gui settings sync: check if settings changed by local player, send to server if changed
+		if self.guisettingschanged then 
+			self.network:sendToServer("server_settingsChanged", self.guisettingschanged)
+			self.guisettingschanged = nil
+		end
+	]]
 end
 
 function guitest.client_onDestroy(self)
-	if guitestgui then guitestgui:setVisible(false, true) end-- set gui invisible without showing messages (displayalert)
+	if guitestgui then guitestgui:setVisible(false, true) end -- sets gui invisible without showing messages (displayalert)
+	-- it is possible to not hide the gui(if it is open) when the block is broken, all callbacks that use self(the instance of this broken block) will cause errors tho.
 end
 
 
 
--- /* Script Developer tools:
-function guitest.client_onRefresh(self) 
-	if guitestgui and (self.shape.worldPosition - self.remoteguiposition):length()<self.remotedistance then -- globalgui
-		if guitestgui then guitestgui:hide() end 
-		guitestgui = nil
-	end
-	self:client_onCreate() 
+-- /* Script Developer tools: '-dev' mode required
+function guitest.client_onRefresh(self) -- has to exist for gui to properly reload ~ can be removed upon workshop release
+	self:client_onCreate() -- optional
 end
-function guitest.server_onRefresh(self) -- re-create gui so that it can show new items added when refreshing, old blocks break!
-	if (self.shape.worldPosition - self.remoteguiposition):length()<self.remotedistance then
-		sm.shape.destroyShape( self.shape, 0 )
-		sm.shape.createPart( self.shape:getShapeUuid(), self.remoteguiposition, sm.quat.identity(), false, true ) 
-	end
-	self:server_onCreate()
+function guitest.server_onRefresh(self) -- has to exist for gui to properly reload ~ can be removed upon workshop release
+	self:server_onCreate() -- optional
 end
 -- */ Script Developer tools
 

@@ -142,6 +142,8 @@ print("guibuilder reloaded")
 
 
 
+guiBuilderScaleX = 1
+guiBuilderScaleY = 1
 function guiBuilder(title, width, height, on_hide, protectionlayers, autoscale)
 	assert(type(title) == "string" or title == nil, "guiBuilder:Title: string expected! got: "..type(title))
 	assert(type(width) == "number" or width == nil, "guiBuilder:width: number expected! got: "..type(width))
@@ -154,8 +156,6 @@ function guiBuilder(title, width, height, on_hide, protectionlayers, autoscale)
 	guiBuilder.autoscale = (autoscale == true or autoscale == nil)
 	guiBuilder.scaleX = 1
 	guiBuilder.scaleY = 1
-	guiBuilderScaleX = 1
-	guiBuilderScaleY = 1
 	guiBuilder.width = width or 600
 	guiBuilder.height = height or 300
 	guiBuilder.title = title or ""
@@ -247,6 +247,14 @@ function guiBuilder(title, width, height, on_hide, protectionlayers, autoscale)
 		end
 		function parentClass.client_onUpdate(self, dt)
 			guibuilder:update(dt)
+		end
+		function parentClass.client_onRefresh(self)
+			parentClass.client_onUpdate = nil
+			if guibuilder.visible then sm.gui.displayAlertText("gui reloaded, press 'e' again for interacts to work",6) end
+			guibuilder.instantiated = false
+		end
+		function parentClass.server_onRefresh(self)
+			self:server_refreshgui()
 		end
 	end
 	
